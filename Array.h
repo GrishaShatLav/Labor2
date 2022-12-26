@@ -181,6 +181,8 @@ inline int Array<T>::insert(int index, const T& value) {
 		resize();
 	if (!items)
 		items = allocate(capacity);
+	if (index < 0 || index >= size)
+		return -1;
 
 	new(items + size) T(std::move(items[size - 1]));
 
