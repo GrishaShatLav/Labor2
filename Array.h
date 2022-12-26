@@ -12,7 +12,7 @@ private:
 	static const int defaultCapacity = 8;
 	static const int kResizeCoef = 2;
 
-	template<bool Const, bool Reverse>
+	template<bool Reverse>
 	class Iterator {
 	private:
 		Array& array;
@@ -31,9 +31,43 @@ private:
 		}
 
 		void set(const T& value) {
-			if (!Const) {
-				*ptr = value;
-			}
+			*ptr = value;
+		}
+
+		void next() {
+			if (!hasNext())
+				throw "Iterator out of range";
+
+			if (Reverse)
+				ptr--;
+			else
+				ptr++;
+		}
+
+		bool hasNext() const {
+			if (Reverse)
+				return ptr >= array.items;
+			else
+				return ptr < array.items + array.size;
+		}
+	};
+
+	template<bool Reverse>
+	class ConstIterator {
+	private:
+		Array& array;
+		T* ptr;
+
+	public:
+		ConstIterator(Array& array) : array(array) {
+			if (Reverse)
+				ptr = array.items + array.size - 1;
+			else
+				ptr = array.items;
+		}
+
+		const T& get() const {
+			return *ptr;
 		}
 
 		void next() {
@@ -57,8 +91,8 @@ private:
 public:
 	Array();
 	Array(int capacity);
-	Array(const Array& other); 
-	Array(Array&& other); 
+	Array(const Array& other); // Copy
+	Array(Array&& other); // Move
 	~Array();
 
 	int insert(const T& value);
@@ -67,13 +101,13 @@ public:
 	int getSize() const;
 	int getCapacity() const;
 
-	Iterator<false, false> iterator();
-	Iterator<true, false> iterator() const;
-	Iterator<false, true> reverseIterator();
-	Iterator<true, true> reverseIterator() const;
+	Iterator<false> iterator();
+	ConstIterator<false> constIterator() const;
+	Iterator<true> reverseIterator();
+	ConstIterator<true> constReverseIterator() const;
 
-	Array& operator=(const Array& other); 
-	Array& operator=(Array&& other); 
+	Array& operator=(const Array& other); // Copy
+	Array& operator=(Array&& other); // Move
 	const T& operator[](int index) const;
 	T& operator[](int index);
 
@@ -86,14 +120,14 @@ private:
 };
 
 template<typename T>
- Array<T>::Array() {
+inline Array<T>::Array() {
 	this->items = nullptr;
 	this->size = 0;
 	this->capacity = defaultCapacity;
 }
 
 template<typename T>
- Array<T>::Array(int capacity) {
+inline Array<T>::Array(int capacity) {
 	this->size = 0;
 
 	if (capacity == 0)
@@ -104,15 +138,15 @@ template<typename T>
 	items = allocate(capacity);
 }
 
-// Constcopy
+// Copy
 template<typename T>
-Array<T>::Array(const Array& other) {
+inline Array<T>::Array(const Array& other) {
 	deepCopy(const_cast<Array&>(other));
 }
 
-// Constmove
+// Move
 template<typename T>
- Array<T>::Array(Array&& other) {
+inline Array<T>::Array(Array&& other) {
 	size = other.size;
 	capacity = other.capacity;
 	items = other.items;
@@ -123,13 +157,13 @@ template<typename T>
 }
 
 template<typename T>
- Array<T>::~Array() {
+inline Array<T>::~Array() {
 	destruct();
 }
 
 
 template<typename T>
- int Array<T>::insert(const T& value) {
+inline int Array<T>::insert(const T& value) {
 	if (size == capacity)
 		resize();
 	else if (!items)
@@ -142,14 +176,16 @@ template<typename T>
 }
 
 template<typename T>
- int Array<T>::insert(int index, const T& value) {
+inline int Array<T>::insert(int index, const T& value) {
 	if (size == capacity)
 		resize();
 	if (!items)
 		items = allocate(capacity);
 
-	for (int i = size; i > index; i--)
-		new(items + i) T(std::move(items[i - 1]));
+	new(items + size) T(std::move(items[size - 1]));
+
+	for (int i = size - 1; i > index; i--)
+		items[i] = T(std::move(items[i - 1]));
 
 	items[index].~T();
 	new(items + index) T(value);
@@ -159,7 +195,7 @@ template<typename T>
 }
 
 template<typename T>
- void Array<T>::remove(int index) {
+inline void Array<T>::remove(int index) {
 	if (size == 0)
 		throw "Array is empty";
 
@@ -171,40 +207,39 @@ template<typename T>
 }
 
 template<typename T>
- int Array<T>::getSize() const {
+inline int Array<T>::getSize() const {
 	return size;
 }
 
 template<typename T>
- int Array<T>::getCapacity() const {
+inline int Array<T>::getCapacity() const {
 	return capacity;
 }
 
 
 template<typename T>
- Array<T>::Iterator<false, false> Array<T>::iterator() {
-	return Iterator<false, false>(*this);
+inline Array<T>::Iterator<false> Array<T>::iterator() {
+	return Iterator<false>(*this);
 }
 
 template<typename T>
-Array<T>::Iterator<true, false> Array<T>::iterator() const {
-	return Iterator<true, false>(*this);
+inline Array<T>::ConstIterator<false> Array<T>::constIterator() const {
+	return ConstIterator<false>(*this);
 }
 
 template<typename T>
- Array<T>::Iterator<false, true> Array<T>::reverseIterator() {
-	return Iterator<false, true>(*this);
+inline Array<T>::Iterator<true> Array<T>::reverseIterator() {
+	return Iterator<true>(*this);
 }
 
 template<typename T>
- Array<T>::Iterator<true, true> Array<T>::reverseIterator() const {
-	return Iterator<true, true>(*this);
+inline Array<T>::ConstIterator<true> Array<T>::constReverseIterator() const {
+	return ConstIterator<true>(*this);
 }
 
-
- 
+// Copy
 template<typename T>
- Array<T>& Array<T>::operator=(const Array& other) {
+inline Array<T>& Array<T>::operator=(const Array& other) {
 	if (this != &other) {
 		destruct();
 		deepCopy(other);
@@ -212,9 +247,9 @@ template<typename T>
 	return *this;
 }
 
-
+// Move
 template<typename T>
- Array<T>& Array<T>::operator=(Array&& other) {
+inline Array<T>& Array<T>::operator=(Array&& other) {
 	if (this != &other) {
 		for (int i = 0; i < size; i++)
 			items[i].~T();
@@ -232,18 +267,18 @@ template<typename T>
 }
 
 template<typename T>
- const T& Array<T>::operator[](int index) const {
+inline const T& Array<T>::operator[](int index) const {
 	return items[index];
 }
 
 template<typename T>
- T& Array<T>::operator[](int index) {
+inline T& Array<T>::operator[](int index) {
 	return items[index];
 }
 
 
 template<typename T>
-void Array<T>::resize() {
+inline void Array<T>::resize() {
 	capacity *= kResizeCoef;
 	T* temp = allocate(capacity);
 
@@ -255,7 +290,7 @@ void Array<T>::resize() {
 }
 
 template<typename T>
-void Array<T>::deepCopy(const Array& other) {
+inline void Array<T>::deepCopy(const Array& other) {
 	size = other.size;
 	capacity = other.capacity;
 	items = allocate(capacity);
@@ -265,12 +300,12 @@ void Array<T>::deepCopy(const Array& other) {
 }
 
 template<typename T>
- T* Array<T>::allocate(size_t capacity) {
+inline T* Array<T>::allocate(size_t capacity) {
 	return static_cast<T*>(std::malloc(capacity * sizeof(T)));
 }
 
 template<typename T>
- void Array<T>::destruct() {
+inline void Array<T>::destruct() {
 	for (int i = 0; i < size; i++)
 		items[i].~T();
 
